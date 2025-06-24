@@ -19,6 +19,13 @@ export default class NaturalLanguageDates extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
 
+    // Quick Add 호환성을 위한 별칭 등록
+    // @ts-ignore
+    if (this.app.plugins.plugins) {
+      // @ts-ignore
+      this.app.plugins.plugins["nldates-obsidian"] = this;
+    }
+
     this.addCommand({
       id: "nlp-dates",
       name: "Parse natural language date",
