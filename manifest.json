@@ -2,7 +2,7 @@
   "id": "nldates-obsidian-korean",
   "name": "Natural Language Dates (Korean)",
   "description": "Create date-links based on natural language (Korean)",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "author": "Creamnuts",
   "authorUrl": "https://github.com/Creamnuts",
   "isDesktopOnly": false,

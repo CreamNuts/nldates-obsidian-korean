@@ -1,6 +1,6 @@
 {
   "name": "nldates-obsidian-korean",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Plugin to parse natural language dates in Obsidian",
   "main": "main.js",
   "scripts": {
