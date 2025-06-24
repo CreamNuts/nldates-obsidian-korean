@@ -10,6 +10,9 @@ import {
   parseOrdinalNumberPattern,
 } from "./utils";
 
+// 한글 번역 모듈 import 추가
+import { translateKoreanToEnglish, containsKorean } from "./korean-translator";
+
 export interface NLDResult {
   formattedString: string;
   date: Date;
@@ -61,8 +64,16 @@ export default class NLDParser {
   }
 
   getParsedDate(selectedText: string, weekStartPreference: DayOfWeek): Date {
+    // 한글 처리 로직 추가
+    let processedText = selectedText;
+
+    // 한글이 포함되어 있으면 영어로 번역
+    if (containsKorean(selectedText)) {
+      processedText = translateKoreanToEnglish(selectedText);
+      console.debug(`Korean text "${selectedText}" translated to "${processedText}"`);
+    }
     const parser = this.chrono;
-    const initialParse = parser.parse(selectedText);
+    const initialParse = parser.parse(processedText);
     const weekdayIsCertain = initialParse[0]?.start.isCertain("weekday");
 
     const weekStart =
@@ -74,10 +85,10 @@ export default class NLDParser {
       weekStart: getWeekNumber(weekStart),
     };
 
-    const thisDateMatch = selectedText.match(/this\s([\w]+)/i);
-    const nextDateMatch = selectedText.match(/next\s([\w]+)/i);
-    const lastDayOfMatch = selectedText.match(/(last day of|end of)\s*([^\n\r]*)/i);
-    const midOf = selectedText.match(/mid\s([\w]+)/i);
+    const thisDateMatch = processedText.match(/this\s([\w]+)/i);
+    const nextDateMatch = processedText.match(/next\s([\w]+)/i);
+    const lastDayOfMatch = processedText.match(/(last day of|end of)\s*([^\n\r]*)/i);
+    const midOf = processedText.match(/mid\s([\w]+)/i);
 
     const referenceDate = weekdayIsCertain
       ? window.moment().weekday(0).toDate()
@@ -97,7 +108,7 @@ export default class NLDParser {
       const thisMonth = parser.parseDate("this month", new Date(), {
         forwardDate: true,
       });
-      return parser.parseDate(selectedText, thisMonth, {
+      return parser.parseDate(processedText, thisMonth, {
         forwardDate: true,
       });
     }
@@ -106,7 +117,7 @@ export default class NLDParser {
       const thisYear = parser.parseDate("this year", new Date(), {
         forwardDate: true,
       });
-      return parser.parseDate(selectedText, thisYear, {
+      return parser.parseDate(processedText, thisYear, {
         forwardDate: true,
       });
     }
@@ -128,6 +139,6 @@ export default class NLDParser {
       });
     }
 
-    return parser.parseDate(selectedText, referenceDate, { locale });
+    return parser.parseDate(processedText, referenceDate, { locale });
   }
 }
