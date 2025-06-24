@@ -27,3 +27,9 @@
 
 자세한 변환 로직은 `src/korean-translator.ts` 파일을 참고하세요.
 
+## 설치 방법
+1.Community Plugin에서 BRAT 플러그인을 설치합니다.
+2.BRAT 플러그인을 활성화합니다.
+3.`BRAT: Plugins: Add a beta plugin for testing (with or without version)` 명령어를 실행합니다.
+4. `Github repository for beta plugin`에 `https://github.com/Creamnuts/nldates-obsidian-korean` 를 입력합니다.
+5. `Enable after installing the plugin`을 체크한 후 `Add plugin`을 클릭합니다.
