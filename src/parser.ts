@@ -11,7 +11,7 @@ import {
 } from "./utils";
 
 // 한글 번역 모듈 import 추가
-import { translateKoreanToEnglish, containsKorean } from "./korean-translator";
+import { translateKoreanToEnglish, containsEnglish } from "./korean-translator";
 
 export interface NLDResult {
   formattedString: string;
@@ -68,7 +68,7 @@ export default class NLDParser {
     let processedText = selectedText;
 
     // 한글이 포함되어 있으면 영어로 번역
-    if (containsKorean(selectedText)) {
+    if (!containsEnglish(selectedText)) {
       processedText = translateKoreanToEnglish(selectedText);
       console.debug(`Korean text "${selectedText}" translated to "${processedText}"`);
     }
