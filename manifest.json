@@ -1,10 +1,10 @@
 {
-  "id": "nldates-obsidian",
-  "name": "Natural Language Dates",
-  "description": "Create date-links based on natural language",
-  "version": "0.6.2",
-  "author": "Argentina Ortega Sainz",
-  "authorUrl": "https://argentinaos.com/",
+  "id": "nldates-obsidian-korean",
+  "name": "Natural Language Dates (Korean)",
+  "description": "Create date-links based on natural language (Korean)",
+  "version": "test",
+  "author": "Creamnuts",
+  "authorUrl": "https://github.com/Creamnuts",
   "isDesktopOnly": false,
   "minAppVersion": "1.0.0"
 }
