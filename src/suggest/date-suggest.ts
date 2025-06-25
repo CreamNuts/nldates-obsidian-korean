@@ -87,42 +87,65 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
 
   getKoreanDateSuggestions(context: EditorSuggestContext): IDateCompletion[] {
     const query = context.query.toLowerCase().trim();
+
+    if (!query) {
+      const sorted = this.sortSuggestionsByDate(BASIC_SUGGESTIONS.basicDates);
+      return sorted.map((label) => ({ label }));
+    }
+
     let suggestions: string[] = [];
 
-    // 1. 다음/지난/이번 패턴
-    const referencePattern = this.handleReferencePattern(query);
-    if (referencePattern.length) {
-      return this.filterAndFormatSuggestions(referencePattern, query);
+    // 1. 모든 종류의 제안 생성
+    suggestions.push(...this.handleReferencePattern(query));
+    suggestions.push(...this.handleNumberPattern(query));
+    suggestions.push(...this.handleWeekdayPattern(query));
+    suggestions.push(...this.handleTimeOfDayPattern(query));
+    if (!this.plugin.settings.excludeYearSuggestions) {
+      suggestions.push(...BASIC_SUGGESTIONS.yearTerms);
     }
+    suggestions.push(...BASIC_SUGGESTIONS.basicDates);
+    KOREAN_TIME_EXPRESSIONS.nativeDays.forEach((day) => {
+      suggestions.push(`${day} 후`, `${day} 전`, `${day} 뒤`);
+    });
 
-    // 2. 숫자 패턴 (아라비아 + 한글)
-    const numberPattern = this.handleNumberPattern(query);
-    if (numberPattern.length) {
-      return this.filterAndFormatSuggestions(numberPattern, query);
-    }
-
-    // 3. 요일 패턴
-    const weekdayPattern = this.handleWeekdayPattern(query);
-    if (weekdayPattern.length) {
-      return this.filterAndFormatSuggestions(weekdayPattern, query);
-    }
-
-    // 4. 시간대 패턴
-    const timeOfDayPattern = this.handleTimeOfDayPattern(query);
-    if (timeOfDayPattern.length) {
-      return this.filterAndFormatSuggestions(timeOfDayPattern, query);
-    }
-
-    // 5. 년도 패턴
-    const yearPattern = BASIC_SUGGESTIONS.yearTerms.filter(year =>
-      year.includes(query) || query.includes(year)
+    // 2. 필터링, 정렬, 포맷팅
+    const uniqueSuggestions = [...new Set(suggestions)];
+    const filtered = uniqueSuggestions.filter((s) =>
+      s.toLowerCase().includes(query)
     );
-    if (yearPattern.length) {
-      return this.filterAndFormatSuggestions(yearPattern, query);
-    }
+    const sorted = this.sortSuggestionsByDate(filtered);
 
-    // 6. 기본 제안
-    return this.filterAndFormatSuggestions(BASIC_SUGGESTIONS.basicDates, query);
+    return sorted.map((label) => ({ label })).slice(0, 10);
+  }
+
+  private sortSuggestionsByDate(suggestions: string[]): string[] {
+    const now = window.moment();
+
+    const getDate = (suggestion: string) => {
+      try {
+        const parsedResult = this.plugin.parseDate(suggestion);
+        if (parsedResult.date && window.moment(parsedResult.date).isValid()) {
+          return window.moment(parsedResult.date);
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    };
+
+    return suggestions.sort((a, b) => {
+      const dateA = getDate(a);
+      const dateB = getDate(b);
+
+      if (!dateA && !dateB) return 0;
+      if (!dateA) return 1;
+      if (!dateB) return -1;
+
+      const diffA = Math.abs(now.diff(dateA));
+      const diffB = Math.abs(now.diff(dateB));
+
+      return diffA - diffB;
+    });
   }
 
   // 다음/지난/이번 패턴 처리
@@ -139,7 +162,12 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
     });
 
     // 기간 단위
-    suggestions.push(`${reference} 주`, `${reference} 달`, `${reference} 년`);
+    if (!this.plugin.settings.excludeYearSuggestions) {
+      suggestions.push(`${reference} 주`, `${reference} 달`, `${reference} 년`);
+    } else {
+      suggestions.push(`${reference} 주`, `${reference} 달`);
+    }
+
 
     // 단순 요일
     BASIC_SUGGESTIONS.weekdays.forEach(day => {
@@ -172,15 +200,16 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
   // 아라비아 숫자 제안 생성
   private generateArabicNumberSuggestions(number: number): string[] {
     const suggestions: string[] = [];
+    const settings = this.plugin.settings;
 
     // 시간 (1-24)
-    if (number <= 24) {
+    if (!settings.excludeTimeSuggestions && number <= 24) {
       suggestions.push(`${number}시간 후`, `${number}시간 전`);
     }
 
     // 일 (1-31)
     if (number <= 31) {
-      suggestions.push(`${number}일 후`, `${number}일 전`);
+      suggestions.push(`${number}일 후`, `${number}일 전`, `${number}일 뒤`);
     }
 
     // 주 (1-8)
@@ -191,13 +220,15 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
     // 월 (1-12)
     if (number <= 12) {
       suggestions.push(
-        `${number}달 후`, `${number}달 전`,
-        `${number}개월 후`, `${number}개월 전`
+        `${number}달 후`,
+        `${number}달 전`,
+        `${number}개월 후`,
+        `${number}개월 전`
       );
     }
 
     // 년 (1-10)
-    if (number <= 10) {
+    if (!settings.excludeYearSuggestions && number <= 10) {
       suggestions.push(`${number}년 후`, `${number}년 전`);
     }
 
@@ -206,7 +237,15 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
 
   // 한글 숫자 찾기
   private findKoreanNumber(query: string): { text: string; index: number } | null {
-    // 고유어 숫자 확인
+    // 1. 고유어 날짜 표현을 먼저 확인 (가장 구체적인 케이스)
+    for (let i = 0; i < KOREAN_TIME_EXPRESSIONS.nativeDays.length; i++) {
+      const day = KOREAN_TIME_EXPRESSIONS.nativeDays[i];
+      if (query.includes(day)) {
+        return { text: day, index: i + 1 };
+      }
+    }
+
+    // 2. 기존의 고유어 숫자 확인
     for (let i = 0; i < KOREAN_TIME_EXPRESSIONS.nativeNumbers.length; i++) {
       const num = KOREAN_TIME_EXPRESSIONS.nativeNumbers[i];
       if (query.includes(num)) {
@@ -214,7 +253,7 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
       }
     }
 
-    // 한자어 숫자 확인
+    // 3. 기존의 한자어 숫자 확인
     for (let i = 0; i < KOREAN_TIME_EXPRESSIONS.sinoNumbers.length; i++) {
       const num = KOREAN_TIME_EXPRESSIONS.sinoNumbers[i];
       if (query.includes(num)) {
@@ -226,18 +265,27 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
   }
 
   // 한글 숫자 제안 생성 (자연스러운 표현만)
-  private generateKoreanNumberSuggestions(koreanNum: string, numValue: number): string[] {
+  private generateKoreanNumberSuggestions(
+    koreanNum: string,
+    numValue: number
+  ): string[] {
     const suggestions: string[] = [];
+    const settings = this.plugin.settings;
 
     // 시간 - 고유어 사용
-    if (KOREAN_TIME_EXPRESSIONS.nativeNumbers.includes(koreanNum)) {
+    if (
+      !settings.excludeTimeSuggestions &&
+      KOREAN_TIME_EXPRESSIONS.nativeNumbers.includes(koreanNum)
+    ) {
       suggestions.push(`${koreanNum} 시간 후`, `${koreanNum} 시간 전`);
     }
 
     // 일 - 고유어 날짜 사용
     if (numValue <= 10 && KOREAN_TIME_EXPRESSIONS.nativeDays[numValue - 1]) {
       const nativeDay = KOREAN_TIME_EXPRESSIONS.nativeDays[numValue - 1];
-      suggestions.push(`${nativeDay} 후`, `${nativeDay} 전`);
+      if (koreanNum === nativeDay) {
+        suggestions.push(`${nativeDay} 후`, `${nativeDay} 전`, `${nativeDay} 뒤`);
+      }
     }
 
     // 주 - 고유어 사용
@@ -251,7 +299,10 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
     }
 
     // 년 - 한자어 사용
-    if (KOREAN_TIME_EXPRESSIONS.sinoNumbers.includes(koreanNum)) {
+    if (
+      !settings.excludeYearSuggestions &&
+      KOREAN_TIME_EXPRESSIONS.sinoNumbers.includes(koreanNum)
+    ) {
       suggestions.push(`${koreanNum} 년 후`, `${koreanNum} 년 전`);
     }
 
@@ -283,14 +334,6 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
     ];
   }
 
-  // 필터링 및 포맷팅
-  private filterAndFormatSuggestions(suggestions: string[], query: string): IDateCompletion[] {
-    return suggestions
-      .filter(suggestion => suggestion.includes(query))
-      .slice(0, 8)
-      .map(label => ({ label }));
-  }
-
   getEnglishDateSuggestions(context: EditorSuggestContext): IDateCompletion[] {
     const query = context.query;
 
@@ -316,12 +359,38 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
       query.match(/^in ([+-]?\d+)/i) || query.match(/^([+-]?\d+)/i);
     if (relativeDate) {
       const timeDelta = relativeDate[1];
-      return [
-        { label: `in ${timeDelta} minutes` }, { label: `in ${timeDelta} hours` },
-        { label: `in ${timeDelta} days` }, { label: `in ${timeDelta} weeks` },
-        { label: `in ${timeDelta} months` }, { label: `${timeDelta} days ago` },
-        { label: `${timeDelta} weeks ago` }, { label: `${timeDelta} months ago` },
-      ].filter((item) => item.label.toLowerCase().includes(context.query));
+      const settings = this.plugin.settings;
+      const suggestions: IDateCompletion[] = [];
+
+      // 시간 제안 (설정에 따라)
+      if (!settings.excludeTimeSuggestions) {
+        suggestions.push(
+          { label: `in ${timeDelta} minutes` },
+          { label: `in ${timeDelta} hours` }
+        );
+      }
+
+      // 기본 날짜 제안
+      suggestions.push(
+        { label: `in ${timeDelta} days` },
+        { label: `in ${timeDelta} weeks` },
+        { label: `in ${timeDelta} months` },
+        { label: `${timeDelta} days ago` },
+        { label: `${timeDelta} weeks ago` },
+        { label: `${timeDelta} months ago` }
+      );
+
+      // 년도 제안 (설정에 따라)
+      if (!settings.excludeYearSuggestions) {
+        suggestions.push(
+          { label: `in ${timeDelta} years` },
+          { label: `${timeDelta} years ago` }
+        );
+      }
+
+      return suggestions.filter((item) =>
+        item.label.toLowerCase().includes(context.query)
+      );
     }
 
     return [
@@ -335,7 +404,6 @@ export default class DateSuggest extends EditorSuggest<IDateCompletion> {
 
   selectSuggestion(suggestion: IDateCompletion, event: KeyboardEvent | MouseEvent): void {
     const { editor } = this.context;
-
     const includeAlias = event.shiftKey;
     let dateStr = "";
     let makeIntoLink = this.plugin.settings.autosuggestToggleLink;

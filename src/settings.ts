@@ -25,6 +25,9 @@ export interface NLDSettings {
   modalToggleTime: boolean;
   modalToggleLink: boolean;
   modalMomentFormat: string;
+
+  excludeTimeSuggestions: boolean;
+  excludeYearSuggestions: boolean;
 }
 
 export const DEFAULT_SETTINGS: NLDSettings = {
@@ -40,6 +43,9 @@ export const DEFAULT_SETTINGS: NLDSettings = {
   modalToggleTime: false,
   modalToggleLink: false,
   modalMomentFormat: "YYYY-MM-DD HH:mm",
+
+  excludeTimeSuggestions: false,
+  excludeYearSuggestions: false,
 };
 
 const weekdays = [
@@ -174,6 +180,34 @@ export class NLDSettingsTab extends PluginSettingTab {
           .setValue(this.plugin.settings.autocompleteTriggerPhrase || "@")
           .onChange(async (value) => {
             this.plugin.settings.autocompleteTriggerPhrase = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Exclude time-related suggestions")
+      .setDesc(
+        "If enabled, suggestions like 'in 2 hours' or '2시간 후' will not be shown."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.excludeTimeSuggestions)
+          .onChange(async (value) => {
+            this.plugin.settings.excludeTimeSuggestions = value;
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Exclude year-related suggestions")
+      .setDesc(
+        "If enabled, suggestions like 'next year' or '내년' will not be shown."
+      )
+      .addToggle((toggle) =>
+        toggle
+          .setValue(this.plugin.settings.excludeYearSuggestions)
+          .onChange(async (value) => {
+            this.plugin.settings.excludeYearSuggestions = value;
             await this.plugin.saveSettings();
           })
       );

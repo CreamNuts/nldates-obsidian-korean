@@ -162,6 +162,9 @@ function handleRelativeDates(text: string): string {
     let result = text;
 
     const units = [
+        { korean: '시간', english: 'hours' },
+        { korean: '분', english: 'minutes' },
+        { korean: '초', english: 'seconds' },
         { korean: '일', english: 'days' },
         { korean: '주', english: 'weeks' },
         { korean: '(달|개월|월)', english: 'months' },
@@ -220,7 +223,7 @@ function handleTimeExpressions(text: string): string {
         });
 
     // 단순 시간 (X시)
-    result = result.replace(new RegExp(`${allNumbers}\\s*시(?!\\s*\\d)`, 'g'),
+    result = result.replace(new RegExp(`${allNumbers}\\s*시(?!\\s*(간|분|\\d))`, 'g'),
         (match, hour) => {
             const englishHour = numberMap[hour] || hour;
             return `${englishHour} o'clock`;
